@@ -119,7 +119,7 @@ def execute_get_live_price(symbol: str) -> dict:
     """ Fetch latest price from DynamoDB. """
     try:
         symbol = symbol.upper()
-        result = table.query(
+        result = table.query(          # type: ignore
             KeyConditionExpression=boto3.dynamodb.conditions.key("symbol").eq(symbol),
             ScanIndexForward=False,
             Limit=1
@@ -185,7 +185,7 @@ def execute_compare_all_stocks(timeframe: str) -> dict:
 def execute_get_price_history(symbol: str, limit: int= 20) -> dict:
     """ Get recent history. """
     try:
-        result = table.query(
+        result = table.query(             # type: ignore
             KeyConditionExpression=boto3.dynamodb.conditions.key("symbol").eq(symbol.upper()),
             ScanIndexForward=False,
             Limit=limit
