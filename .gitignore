@@ -5,4 +5,4 @@ __pycache__/
 *.db
 .DS_Store
 *.credentials.csv
-AWS keys.csv
+AWS keys.csv.env
