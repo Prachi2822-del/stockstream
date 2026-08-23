@@ -25,7 +25,7 @@ from ai.advisor import ask_advisor
 
 load_dotenv()
 
-# ── Page config ───────────────────────────────────────────────────────────
+# Page config 
 
 st.set_page_config(
     page_title="StockStream AI",
@@ -34,7 +34,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────
+# Custom CSS 
 
 st.markdown("""
 <style>
@@ -83,7 +83,7 @@ st.markdown("""
 
 STOCKS = ["AAPL", "GOOGLE", "MSFT", "AMZN", "TSLA"]
 
-# ── AWS connection ────────────────────────────────────────────────────────
+# AWS connection
 
 @st.cache_resource
 def get_dynamodb():
@@ -96,7 +96,7 @@ dynamodb = get_dynamodb()
 table    = dynamodb.Table(os.getenv("DYNAMODB_TABLE", "stock_prices"))
 
 
-# ── Data fetching ─────────────────────────────────────────────────────────
+# Data fetching 
 
 def fetch_latest_price(symbol: str) -> dict:
     """Get the most recent price for a stock."""
@@ -144,7 +144,7 @@ def fetch_price_history(symbol: str, limit: int = 100) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-# ── Chart builders ────────────────────────────────────────────────────────
+# Chart builders
 
 def build_price_chart(symbol: str, df: pd.DataFrame, analysis: dict) -> go.Figure:
     """Build price chart with MA lines overlaid."""
@@ -246,7 +246,7 @@ def build_volume_chart(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-# ── Signal badge ──────────────────────────────────────────────────────────
+# Signal badge 
 
 def signal_badge(signal: str) -> str:
     colors = {
@@ -260,14 +260,14 @@ def signal_badge(signal: str) -> str:
     return f"{colors.get(signal, '⚪')} {signal}"
 
 
-# ── Main app ──────────────────────────────────────────────────────────────
+# Main app
 
 def main():
 
-    # ── Header ────────────────────────────────────────────────────────────
+    # Header
     st.markdown("## 📈 StockStream AI Investment Platform")
 
-    # ── Top price cards ───────────────────────────────────────────────────
+    # Top price cards
     cols = st.columns(5)
     for i, symbol in enumerate(STOCKS):
         data = fetch_latest_price(symbol)
@@ -439,7 +439,7 @@ def main():
             st.session_state.chat_history = []
             st.rerun()
 
-    # ── Auto refresh every 10 seconds ────────────────────────────────────
+    # Auto refresh every 30 seconds
     st.markdown("---")
     st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')} · "
                f"Auto-refreshes every 30 seconds")
