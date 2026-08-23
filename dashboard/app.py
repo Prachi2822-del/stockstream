@@ -99,7 +99,7 @@ table    = dynamodb.Table(os.getenv("DYNAMODB_TABLE", "stock_prices"))
 # Data fetching 
 
 def fetch_latest_price(symbol: str) -> dict:
-    """Get the most recent price for a stock."""
+    """Get the most recent price using query — fast and accurate."""
     try:
         result = table.query(
             KeyConditionExpression=boto3.dynamodb.conditions.Key("symbol").eq(symbol),
@@ -115,15 +115,16 @@ def fetch_latest_price(symbol: str) -> dict:
                 "pct_change": float(item.get("pct_change", 0)),
                 "volume":     int(item.get("volume", 0)),
                 "timestamp":  str(item["timestamp"]),
-                "source":     str(item.get("source", "simulator")) 
+                "source":     str(item.get("source", "simulator"))
             }
     except Exception as e:
-        pass
-    return {"symbol": symbol, "price": 0, "pct_change": 0, "volume": 0}
+        print(f"Error fetching {symbol}: {e}")
+    return {"symbol": symbol, "price": 0, "pct_change": 0,
+            "volume": 0, "source": "unknown"}
 
 
 def fetch_price_history(symbol: str, limit: int = 100) -> pd.DataFrame:
-    """Get price history for charting."""
+    """Get price history using query — returns all records for a symbol."""
     try:
         result = table.query(
             KeyConditionExpression=boto3.dynamodb.conditions.Key("symbol").eq(symbol),
@@ -135,14 +136,15 @@ def fetch_price_history(symbol: str, limit: int = 100) -> pd.DataFrame:
             return pd.DataFrame()
 
         df = pd.DataFrame(items)
-        df["price"]     = df["price"].astype(float)
-        df["volume"]    = df["volume"].astype(int)
-        df["pct_change"]= df["pct_change"].astype(float)
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df["price"]      = df["price"].astype(float)
+        df["volume"]     = df["volume"].astype(int)
+        df["pct_change"] = df["pct_change"].astype(float)
+        df["timestamp"]  = pd.to_datetime(df["timestamp"])
         return df.sort_values("timestamp").reset_index(drop=True)
-    except Exception as e:
-        return pd.DataFrame()
 
+    except Exception as e:
+        print(f"Error fetching history for {symbol}: {e}")
+        return pd.DataFrame()
 
 # Chart builders
 
@@ -323,7 +325,7 @@ def main():
             # Price + MA chart
             st.plotly_chart(
                 build_price_chart(selected, df, analysis),
-                use_container_width=True
+                use_container_width='stretch'
             )
 
             # RSI + Volume side by side
@@ -331,12 +333,12 @@ def main():
             with r_col:
                 st.plotly_chart(
                     build_rsi_chart(df),
-                    use_container_width=True
+                    use_container_width='stretch'
                 )
             with v_col:
                 st.plotly_chart(
                     build_volume_chart(df),
-                    use_container_width=True
+                    use_container_width='stretch'
                 )
 
             # Signal summary
@@ -363,26 +365,26 @@ def main():
         st.markdown("**Quick questions:**")
         q1, q2, q3 = st.columns(3)
         with q1:
-            if st.button("Best buy\nnow?", use_container_width=True):
+            if st.button("Best buy\nnow?", use_container_width='stretch'):
                 st.session_state.pending_question = \
                     "Which stock is the best to buy right now for short term?"
         with q2:
-            if st.button("Best long\nterm?", use_container_width=True):
+            if st.button("Best long\nterm?", use_container_width='stretch'):
                 st.session_state.pending_question = \
                     "Which stock is best for long term investment of 6 months?"
         with q3:
-            if st.button("Market\noverview?", use_container_width=True):
+            if st.button("Market\noverview?", use_container_width='stretch'):
                 st.session_state.pending_question = \
                     "Give me a full market overview of all 5 stocks"
 
         # Stock-specific quick buttons
         qa, qb = st.columns(2)
         with qa:
-            if st.button(f"Analyse {selected}", use_container_width=True):
+            if st.button(f"Analyse {selected}", use_container_width='stretch'):
                 st.session_state.pending_question = \
                     f"Give me a full analysis of {selected} — should I buy or sell?"
         with qb:
-            if st.button("Riskiest\nstock?", use_container_width=True):
+            if st.button("Riskiest\nstock?", use_container_width='stretch'):
                 st.session_state.pending_question = \
                     "Which of the 5 stocks is the riskiest right now and why?"
 
@@ -435,7 +437,7 @@ def main():
             st.rerun()
 
         # Clear chat button
-        if st.button("Clear chat", use_container_width=True):
+        if st.button("Clear chat", use_container_width='stretch'):
             st.session_state.chat_history = []
             st.rerun()
 
