@@ -341,21 +341,31 @@ def main():
                     use_container_width='stretch'
                 )
 
-            # Signal summary
+            # Signal summary — calculate from already fetched df
             st.markdown("### Signal Summary")
-            s1, s2, s3, s4 = st.columns(4)
-            s1.metric("Short Term",  signal_badge(analysis.get("short_term","N/A")))
-            s2.metric("Long Term",   signal_badge(analysis.get("long_term","N/A")))
-            s3.metric("RSI",         f"{analysis.get('rsi', 0):.1f}")
-            s4.metric("Confidence",  f"{analysis.get('confidence', 0)}%")
 
-            # Reasons
-            if analysis.get("reasons"):
-                with st.expander("Why this signal?"):
-                    for reason in analysis["reasons"]:
-                        st.write(f"→ {reason}")
-        else:
-            st.warning(f"No data for {selected} — run the producer first")
+            if not df.empty and len(df) >= 14:
+                from analyser.technical import generate_signal
+                signal = generate_signal(df)
+
+                s1, s2, s3, s4 = st.columns(4)
+                s1.metric("Short Term",  signal_badge(signal.get("short_term", "N/A")))
+                s2.metric("Long Term",   signal_badge(signal.get("long_term",  "N/A")))
+                s3.metric("RSI",         f"{signal.get('rsi', 0):.1f}")
+                s4.metric("Confidence",  f"{signal.get('confidence', 0)}%")
+
+                if signal.get("reasons"):
+                    with st.expander("Why this signal?"):
+                        for reason in signal["reasons"]:
+                            st.write(f"→ {reason}")
+            else:
+                records = len(df) if not df.empty else 0
+                needed  = 14 - records
+                st.warning(
+                    f"{selected} only has {records} records — "
+                    f"need {needed} more for signal calculation. "
+                    f"Run the producer longer to build up data."
+                )
 
     # RIGHT: AI Chat
     with chat_col:
