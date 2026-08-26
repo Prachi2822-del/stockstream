@@ -18,34 +18,34 @@ import pandas as pd
 import numpy as np
 from decimal import Decimal
 from datetime import datetime, timezone
-from boto3.dynamodb.conditions import Key
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
-dynamodb = boto3.resource("dynamodb", region_name=os.getenv("AWS_DEFAULT_REGION", "ap-southeast-2"))
-table    = dynamodb.Table(os.getenv("DYNAMODB_TABLE", "stock_prices"))
+REGION         = os.getenv("AWS_DEFAULT_REGION", "ap-southeast-2")
+DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE") or os.getenv("DYNAMODB_TABLE_NAME", "stock_prices")
+
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
+table    = dynamodb.Table(DYNAMODB_TABLE)
 
 # Fetch price history from DynamoDB
 
 def fetch_price_history(symbol: str, limit: int = 100) -> pd.DataFrame:
-    """
-    Fetch recent price history for a stock from DynamoDB.
-    Uses scan with filter — works without GSI.
-    """
+    """Fetch recent price history for a stock from DynamoDB."""
     try:
-        from boto3.dynamodb.conditions import Key, Attr
-
-        response = table.scan(
-            FilterExpression=Attr("symbol").eq(symbol),
-            Limit=500
+        # Use scan with filter — works regardless of table schema
+        from boto3.dynamodb.conditions import Attr
+        result = table.scan(
+            FilterExpression=Attr("symbol").eq(symbol)
         )
-        items = response.get("Items", [])
+        items = result.get("Items", [])
 
         if not items:
             print(f"  No items found for {symbol}")
             return pd.DataFrame()
+
+        print(f"  {symbol}: {len(items)} records fetched")
 
         df = pd.DataFrame(items)
         df["price"]      = df["price"].astype(float)
@@ -54,14 +54,10 @@ def fetch_price_history(symbol: str, limit: int = 100) -> pd.DataFrame:
         df["timestamp"]  = pd.to_datetime(df["timestamp"])
         df = df.sort_values("timestamp").reset_index(drop=True)
 
-        # Keep only latest records up to limit
-        df = df.tail(limit).reset_index(drop=True)
-
-        print(f"  {symbol}: {len(df)} records fetched")
-        return df
+        return df.tail(limit).reset_index(drop=True)
 
     except Exception as e:
-        print(f"Error fetching history for {symbol}: {e}")
+        print(f"  Error fetching {symbol}: {e}")
         return pd.DataFrame()
 
 

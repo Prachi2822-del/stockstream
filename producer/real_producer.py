@@ -18,8 +18,8 @@ load_dotenv()
 STREAM_NAME      = os.getenv("KINESIS_STREAM_NAME", "stockstream-prices")
 REGION           = os.getenv("AWS_DEFAULT_REGION", "ap-southeast-2")
 DYNAMODB_TABLE   = os.getenv("DYNAMODB_TABLE", "stock_prices")
-INTERVAL_SECONDS = 120
-SESSION_MINUTES  = 60
+INTERVAL_SECONDS = 30
+SESSION_MINUTES  = 480
 
 STOCKS = {
     "AAPL":   ("AAPL",  "Apple Inc"),
@@ -109,19 +109,17 @@ def run():
     end_time = time.time() + SESSION_MINUTES * 60
 
     try:
-        while time.time() < end_time:
+        while time.time() < end_time:           # ← loop condition
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Fetching real prices...")
 
             for symbol in STOCKS:
                 record = fetch_price(symbol)
                 if record is None:
                     errors += 1
+                    time.sleep(3)
                     continue
 
-                # Save to DynamoDB directly
                 db_ok = save_to_dynamodb(record)
-
-                # Also send to Kinesis
                 send_to_kinesis(record)
 
                 if db_ok:
@@ -130,15 +128,18 @@ def run():
                     if abs(record["pct_change"]) > 1.0:
                         print(f"  ⚠ ANOMALY: {symbol} {record['pct_change']:+.2f}% → ${record['price']:.2f}")
                     else:
-                        print(f"  {symbol:6s} ${record['price']:8.2f}  {arrow} {abs(record['pct_change']):.4f}%  vol:{record['volume']:,}  [REAL]")
+                        print(
+                            f"  {symbol:6s} ${record['price']:8.2f}  "
+                            f"{arrow} {abs(record['pct_change']):.4f}%  "
+                            f"vol:{record['volume']:,}  [REAL]"
+                        )
                 else:
                     errors += 1
-
-                time.sleep(3)  # avoid rate limiting
+                time.sleep(3)
 
             remaining = int(end_time - time.time())
             print(f"\n  Sent:{sent} | Errors:{errors} | Next in {INTERVAL_SECONDS}s | {remaining//60}m remaining")
-            time.sleep(INTERVAL_SECONDS)
+            time.sleep(INTERVAL_SECONDS)        # ← this MUST be inside the while loop
 
     except KeyboardInterrupt:
         print("\nStopped by user")

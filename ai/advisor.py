@@ -8,13 +8,10 @@ the user's question, chains them together, and gives a
 complete investment recommendation with real numbers
 """
 
-import sys
 import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import json
 import boto3
+from boto3.dynamodb.conditions import Key, Attr
 import anthropic
 from dotenv import load_dotenv
 from decimal import Decimal
@@ -22,9 +19,17 @@ from analyser.technical import analyse_stock, compare_all_stocks
 
 load_dotenv()
 
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-MODEL = "claude-sonnet-4-6"
-dynamodb = boto3.resource("dynamodb", region_name=os.getenv("AWS_DEFAULT_REGION", "ap-southeast-2"))
+client   = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+MODEL    = "claude-sonnet-4-6"
+
+# ── Fix: initialise DynamoDB properly ────────────────────────────────────
+REGION         = os.getenv("AWS_DEFAULT_REGION", "ap-southeast-2")
+DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE") or os.getenv("DYNAMODB_TABLE_NAME", "stock_prices")
+
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
+table    = dynamodb.Table(DYNAMODB_TABLE)
+
+print(f"Advisor connected to table: {DYNAMODB_TABLE}")
 
 STOCKS = ["AAPL", "GOOGLE", "MSFT", "AMZN", "TSLA"]
 
@@ -116,15 +121,15 @@ def decimal_to_float(obj):
     raise TypeError(f"Object of type {type(obj)} is not JSON serialisable")
 
 def execute_get_live_price(symbol: str) -> dict:
-    """ Fetch latest price from DynamoDB. """
+    """Fetch latest price from DynamoDB."""
     try:
         symbol = symbol.upper()
-        result = table.query(          # type: ignore
-            KeyConditionExpression=boto3.dynamodb.conditions.key("symbol").eq(symbol),
+        result = table.query(
+            KeyConditionExpression=Key("symbol").eq(symbol),
             ScanIndexForward=False,
             Limit=1
         )
-        items = result.get("Items", []),
+        items = result.get("Items", [])
         if not items:
             return {"error": f"No data found for {symbol}"}
 
@@ -182,26 +187,25 @@ def execute_compare_all_stocks(timeframe: str) -> dict:
     except Exception as e:
         return {"error": str(e)} 
 
-def execute_get_price_history(symbol: str, limit: int= 20) -> dict:
-    """ Get recent history. """
+def execute_get_price_history(symbol: str, limit: int = 20) -> dict:
     try:
-        result = table.query(             # type: ignore
-            KeyConditionExpression=boto3.dynamodb.conditions.key("symbol").eq(symbol.upper()),
+        result = table.query(
+            KeyConditionExpression=Key("symbol").eq(symbol.upper()),
             ScanIndexForward=False,
             Limit=limit
         )
         items = result.get("Items", [])
-        prices =[
+        prices = [
             {
                 "price":      float(i["price"]),
                 "pct_change": float(i.get("pct_change", 0)),
-                "timestamp":  str(i["timestamp"]) 
+                "timestamp":  str(i["timestamp"])
             }
             for i in reversed(items)
         ]
         return {"symbol": symbol, "history": prices, "count": len(prices)}
     except Exception as e:
-        return{ "error": str(e)}
+        return {"error": str(e)}
 
 def execute_tool(tool_name: str, tool_input: dict) -> str:
     if tool_name == "get_live_price":
